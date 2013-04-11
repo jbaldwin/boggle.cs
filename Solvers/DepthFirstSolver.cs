@@ -5,11 +5,11 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Threading;
 
-namespace boggle
+namespace boggle.Solvers
 {
 	public class DepthFirstSolver : ISolver
 	{
-		private static int[][] neighbors = new int[][] {
+		private static int[][] _neighbors = new int[][] {
 			new int[] { -1, -1 },
 			new int[] {  0, -1 },
 			new int[] {  1, -1 },
@@ -20,14 +20,14 @@ namespace boggle
 			new int[] {  1,  1 }
 		};
 
-		private object locker = new object();
+		private object _mergeResultsLock = new object();
 
 		public DepthFirstSolver()
 		{
 
 		}
 
-		public Result Run(IBoard board, ILibrary library)
+		public Result Solve(IBoard board, ILibrary library)
 		{
 			var result = new Result();
 			result.Words = new HashSet<string>();
@@ -35,25 +35,22 @@ namespace boggle
 
 			var tasks = new List<Task>();
 
-			for (int i = 0; i < board.X; i++)
+			for (int i = 0; i < board.Width; i++)
 			{
-				for (int j = 0; j < board.Y; j++)
+				for (int j = 0; j < board.Height; j++)
 				{
-					var state = new ThreadState()
-					{
-						X = i,
-						Y = j
-					};
+					// Capture i/j values (will fail without since i/j change too fast before the thread runs)
+					var state = new ThreadState(i, j);
 
 					tasks.Add(Task.Run(() =>
 					{
 
 						var path = new WordPath(board.Grid[state.X][state.Y], state.X, state.Y);
+						var myWords = Worker(state.X, state.Y, path, 1, board, library.Books[board.Grid[state.X][state.Y]], new HashSet<string>());
 
-
-						var myWords = Worker(state.X, state.Y, path, 1, board, library.Book(board.Grid[state.X][state.Y]), new HashSet<string>());
-
-						lock (locker)
+						// Merge results (queue up instead and have the main thread do the work?
+						// This seems like a bottle neck but since tasks are not reused it might not matter.
+						lock (_mergeResultsLock)
 						{
 							result.Words.UnionWith(myWords);
 						}
@@ -70,22 +67,22 @@ namespace boggle
 			return result;
 		}
 
-		private HashSet<string> Worker(int x, int y, WordPath path, int depth, IBoard board, PrefixNode parent, HashSet<string> words)
+		private HashSet<string> Worker(int x, int y, WordPath path, int depth, IBoard board, ILetter parent, HashSet<string> words)
 		{
 			var c = board.Grid[x][y];
 
 			for (int i = 0; i < 8; i++)
 			{
-				var nX = x + neighbors[i][0];
-				var nY = y + neighbors[i][1];
+				var nX = x + _neighbors[i][0];
+				var nY = y + _neighbors[i][1];
 
 				// check for out of bounds
 				if (nX < 0 ||
-					nX >= board.X)
+					nX >= board.Width)
 					continue;
 
 				if (nY < 0 ||
-					nY >= board.Y)
+					nY >= board.Height)
 					continue;
 
 				// do not re-use tiles, and do not check your own level
@@ -124,6 +121,12 @@ namespace boggle
 	{
 		public volatile int X;
 		public volatile int Y;
+
+		public ThreadState(int x, int y)
+		{
+			X = x;
+			Y = y;
+		}
 	}
 
 	struct Point

@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace boggle
+namespace boggle.Boards
 {
 	public class Board : IBoard
 	{
@@ -20,8 +20,8 @@ namespace boggle
 			}
 		}
 
-		public int X { get; private set; }
-		public int Y { get; private set; }
+		public int Width { get; private set; }
+		public int Height { get; private set; }
 
 		public Board(int x, int y)
 		{
@@ -52,8 +52,8 @@ namespace boggle
 
 		public void Resize(int x, int y)
 		{
-			X = x;
-			Y = y;
+			Width = x;
+			Height = y;
 			_grid = new byte[x][];
 			for (var i = 0; i < x; i++)
 			{
@@ -64,14 +64,14 @@ namespace boggle
 		public void UseBoard(byte[][] board)
 		{
 			_grid = board;
-			X = _grid.Length;
-			Y = _grid[0].Length;
+			Width = _grid.Length;
+			Height = _grid[0].Length;
 
 			for (int i = 0; i < _grid.Length; i++)
 			{
 				for (int j = 0; j < _grid[i].Length; j++)
 				{
-					if (_grid[i][j] >= 97 && _grid[i][j] <= 122)
+					if (_grid[i][j] >= (byte)'a' && _grid[i][j] <= (byte)'z')
 					{
 						_grid[i][j] -= 32;
 					}
@@ -82,23 +82,36 @@ namespace boggle
 		public void UseSerialized(string data)
 		{
 			var tokens = data.Split(' ');
-			X = int.Parse(tokens[0]);
-			Y = int.Parse(tokens[1]);
+			Width = int.Parse(tokens[0]);
+			Height = int.Parse(tokens[1]);
 			var rows = new List<string>();
 
-			_grid = new byte[X][];
-			for (int i = 0; i < X; i++)
-				_grid[i] = new byte[Y];
+			_grid = new byte[Width][];
+			for (int i = 0; i < Width; i++)
+				_grid[i] = new byte[Height];
 
-			for (int i = 0; i < X; i++)
+			for (int i = 0; i < Width; i++)
 			{
-				var line = tokens[2].Substring(i * X, Y);
+				var line = tokens[2].Substring(i * Width, Height);
 				line = line.ToUpper();
-				for (int j = 0; j < Y; j++)
+				for (int j = 0; j < Height; j++)
 				{
 					_grid[i][j] = (byte)line[j];
 				}
 			}
+		}
+
+		public string Serialize()
+		{
+			var data = new StringBuilder(Width.ToString() + " " + Height.ToString() + " ");
+			for (int i = 0; i < Width; i++)
+			{
+				for (int j = 0; j < Height; j++)
+				{
+					data.Append((char)Grid[i][j]);
+				}
+			}
+			return data.ToString();
 		}
 	}
 }
