@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Threading;
 
 namespace boggle
 {
@@ -19,7 +20,7 @@ namespace boggle
 			new int[] {  1,  1 }
 		};
 
-		private HashSet<string> _words;
+		private object locker = new object();
 
 		public DepthFirstSolver()
 		{
@@ -28,28 +29,48 @@ namespace boggle
 
 		public Result Run(IBoard board, ILibrary library)
 		{
-			_words = new HashSet<string>();
-
 			var result = new Result();
+			result.Words = new HashSet<string>();
 			var start = Environment.TickCount;
+
+			var tasks = new List<Task>();
 
 			for (int i = 0; i < board.X; i++)
 			{
 				for (int j = 0; j < board.Y; j++)
 				{
-					var path = new WordPath(board.Grid[i][j], i, j);
-					Run(i, j, path, 1, board, library.Book(board.Grid[i][j]));
+					var state = new ThreadState()
+					{
+						X = i,
+						Y = j
+					};
+
+					tasks.Add(Task.Run(() =>
+					{
+
+						var path = new WordPath(board.Grid[state.X][state.Y], state.X, state.Y);
+
+
+						var myWords = Worker(state.X, state.Y, path, 1, board, library.Book(board.Grid[state.X][state.Y]), new HashSet<string>());
+
+						lock (locker)
+						{
+							result.Words.UnionWith(myWords);
+						}
+					
+					}));
 				}
 			}
 
+			Task.WaitAll(tasks.ToArray());
+
 			var stop = Environment.TickCount;
 			result.ElapsedMS = stop - start;
-			result.Words = _words;
 
 			return result;
 		}
 
-		private void Run(int x, int y, WordPath path, int depth, IBoard board, PrefixNode parent)
+		private HashSet<string> Worker(int x, int y, WordPath path, int depth, IBoard board, PrefixNode parent, HashSet<string> words)
 		{
 			var c = board.Grid[x][y];
 
@@ -85,16 +106,24 @@ namespace boggle
 					{
 						if (!child.IsFound)
 						{
-							_words.Add(word);
+							words.Add(word);
 							child.IsFound = true;
 						}
 					}
 
 					// maximum recusion should be maximum word length (28~)
-					Run(nX, nY, path, depth + 1, board, child);
+					Worker(nX, nY, path, depth + 1, board, child, words);
 				}
 			}
+
+			return words;
 		}
+	}
+
+	class ThreadState
+	{
+		public volatile int X;
+		public volatile int Y;
 	}
 
 	struct Point
