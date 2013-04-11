@@ -6,10 +6,10 @@ using System.Threading.Tasks;
 
 namespace boggle
 {
-    class Program
-    {
-        static void Main(string[] args)
-        {
-        }
-    }
+	public interface ILibrary
+	{
+		void Load(string path);
+		PrefixNode Book(byte c);
+		void Reset();
+	}
 }
